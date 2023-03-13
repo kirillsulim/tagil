@@ -1,0 +1,50 @@
+name: Release app
+
+on:
+  push:
+    branches:
+      - "master"
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yaml
+  publish:
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Import Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v2
+        with:
+          url: https://vault.su0.org
+          method: approle
+          roleId: "ci_kirillsulim_oak_build"
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          secrets: |
+            secret/data/ci/kirillsulim/oak-build pypi_token | PYPI_API_TOKEN
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+      - name: Build package
+        run: poetry build
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+        with:
+          user: __token__
+          password: ${{ steps.secrets.outputs.PYPI_API_TOKEN }}
+      - name: Tag
+        run: |
+          export TAG="$(poetry version -s)"
+          git tag "${TAG}"
+          git push origin "${TAG}"
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+      - name: Release on github
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG }}
