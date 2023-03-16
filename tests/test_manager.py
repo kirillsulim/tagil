@@ -1,7 +1,6 @@
 from unittest import TestCase
 
-from tagil.decorators import component
-from tagil.manager import InjectionManager
+from tagil import component, InjectionManager
 
 
 @component
