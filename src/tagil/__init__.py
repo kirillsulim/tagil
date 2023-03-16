@@ -1,2 +1,2 @@
-from decorators import component
-from manager import InjectionManager
+from tagil.decorators import component
+from tagil.manager import InjectionManager
