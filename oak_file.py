@@ -4,7 +4,7 @@ from oak_build import task, run
 LINE_LENGTH = 120
 
 STYLE_TARGETS = [
-    "integration_tests",
+    "examples",
     "src",
     "tests",
     "oak_file.py",
@@ -22,15 +22,9 @@ def unit_tests():
     run("poetry run pytest tests")
 
 
-@task
-def integration_tests():
-    run("poetry run pytest integration_tests")
-
-
 @task(
     depends_on=[
         unit_tests,
-        integration_tests,
     ]
 )
 def tests():
