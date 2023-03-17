@@ -1,21 +1,76 @@
 import inspect
 from inspect import signature
 from collections import defaultdict
-from typing import Optional, Dict, Union, Type
+from typing import Optional, Dict, Union, Type, Callable
 from threading import Lock
 
 from tagil.exceptions import *
 from tagil.singleton import Singleton
 
 
+def _extract_type_from_annotation(annotation) -> Optional[Type]:
+    return None if annotation is inspect._empty else annotation
+
+
+class ArgumentData:
+    def __init__(self, name: Optional[str], cls: Optional[Type]):
+        self.name = name
+        self.cls = cls
+
+
 class InstanceContainer:
-    def __init__(self):
-        self.name = None
-        self.cls = None
-        self.constructor = None
-        self.inject = None
+    def __init__(
+            self,
+            cls: Optional[type] = None,
+            constructor: Optional[Callable] = None,
+            name: Optional[str] = None,
+            inject: Optional[Dict[str, Union[str, Type]]] = None,
+    ):
+        if cls is None and constructor is None:
+            raise ValueError(f"Expect cls or constructor but both are None")
+        elif cls is not None and constructor is not None:
+            raise ValueError(f"Expect clr or constructor but both are not None")
+
+        if constructor is not None:
+            cls = _extract_type_from_annotation(signature(constructor).return_annotation)
+            if name is None:
+                name = constructor.__name__
+        elif cls is not None:
+            constructor = cls
+        else:
+            raise ValueError(f"Somehow check of constructor or cls presence failed")
+
+        self.cls = cls
+        self.constructor = constructor
+        self.name = name
+        self.inject = {} if inject is None else inject
+
         self.instance = None
         self.mutex = Lock()
+
+    def get_arguments_data(self) -> Dict[str, ArgumentData]:
+        result = {}
+
+        argument_types = signature(self.constructor).parameters
+        for argument in argument_types:
+            if argument in self.inject:
+                inject_direction = self.inject[argument]
+                if isinstance(inject_direction, str):
+                    name = inject_direction
+                    cls = None
+                elif isinstance(inject_direction, Type):
+                    name = None
+                    cls = inject_direction
+                else:
+                    raise ValueError(
+                        f"Illegal inject direction '{inject_direction}' of type {inject_direction.__class__}.")
+            else:
+                cls = _extract_type_from_annotation(argument_types[argument].annotation)
+                name = argument
+
+            result[argument] = ArgumentData(name, cls)
+
+        return result
 
 
 class InjectionManager(metaclass=Singleton):
@@ -23,40 +78,33 @@ class InjectionManager(metaclass=Singleton):
         self.by_class = defaultdict(list)
         self.by_name = defaultdict(list)
 
-    def register_component(self, cls, name: Optional[str] = None, inject: Optional[Dict[str, Union[str, Type]]] = None):
-        ic = InstanceContainer()
-        ic.cls = cls
-        ic.name = name
-        if inject is not None:
-            ic.inject = inject
-        else:
-            ic.inject = {}
+    def register_component(
+            self,
+            cls: Type,
+            name: Optional[str] = None,
+            inject: Optional[Dict[str, Union[str, Type]]] = None
+    ):
+        ic = InstanceContainer(
+            cls=cls,
+            name=name,
+            inject=inject
+        )
 
-        self.by_class[cls].append(ic)
-        for base in cls.__bases__:
-            self.by_class[base].append(ic)
+        self._add_container(ic)
 
-        if name is not None:
-            self._add_container_by_name(name, ic)
+    def register_constructor(
+            self,
+            method: Callable,
+            name: Optional[str] = None,
+            inject: Optional[Dict[str, Union[str, Type]]] = None
+    ):
+        ic = InstanceContainer(
+            constructor=method,
+            name=name,
+            inject=inject,
+        )
 
-    def register_constructor(self, method, name: Optional[str] = None, inject: Optional[Dict[str, Union[str, Type]]] = None):
-        ic = InstanceContainer()
-        ic.constructor = method
-        if inject is not None:
-            ic.inject = inject
-        else:
-            ic.inject = {}
-
-        if name is None:
-            name = method.__name__
-
-        ic.name = name
-
-        res = signature(method).return_annotation
-        if res is not inspect._empty:
-            self._add_container_by_class(res, ic)
-
-        self._add_container_by_name(name, ic)
+        self._add_container(ic)
 
     def get_component(self, cls=None, name=None):
         candidates = []
@@ -81,29 +129,20 @@ class InjectionManager(metaclass=Singleton):
             return ic.instance
 
         with ic.mutex:
-            constructor_function = ic.constructor if ic.constructor is not None else ic.cls
+            if ic.instance is None:
+                kwargs = {}
+                for argument, data in ic.get_arguments_data().items():
+                    kwargs[argument] = self.get_component(cls=data.cls, name=data.name)
 
-            argument_types = signature(constructor_function).parameters
-            kwargs = {}
-            for argument in argument_types:
-                type = argument_types[argument].annotation
-                type = type if type is not inspect._empty else None
-                name = argument
-                if argument in ic.inject:
-                    inject_direction = ic.inject[argument]
-                    if isinstance(inject_direction, str):
-                        name = inject_direction
-                        type = None
-                    elif isinstance(inject_direction, Type):
-                        type = inject_direction
-                    else:
-                        raise ValueError(f"Illegal inject direction '{inject_direction}' of type {inject_direction.__class__}.")
+                ic.instance = ic.constructor(**kwargs)
+            return ic.instance
 
-                kwargs[argument] = self.get_component(cls=type, name=name)
+    def _add_container(self, ic: InstanceContainer):
+        if ic.name is not None:
+            self._add_container_by_name(ic.name, ic)
 
-        instance = constructor_function(**kwargs)
-        ic.instance = instance
-        return instance
+        if ic.cls is not None:
+            self._add_container_by_class(ic.cls, ic)
 
     def _add_container_by_name(self, name: str, ic: InstanceContainer):
         if name in self.by_name:
