@@ -77,6 +77,7 @@ class InjectionManager(metaclass=Singleton):
     def __init__(self):
         self.by_class = defaultdict(list)
         self.by_name = defaultdict(list)
+        self.init_stack = []
 
     def register_component(
             self,
@@ -124,6 +125,17 @@ class InjectionManager(metaclass=Singleton):
         else:
             raise ManyComponentsMatches(map(lambda ic: ic.cls, candidates))
 
+    def post_init(self):
+        for instance in self.init_stack:
+            if self._has_post_init(instance):
+                instance.post_init()
+
+    def pre_destroy(self):
+        while len(self.init_stack) != 0:
+            instance = self.init_stack.pop()
+            if self._has_pre_destroy(instance):
+                instance.pre_destroy()
+
     def _get_instance(self, ic: InstanceContainer):
         if ic.instance is not None:
             return ic.instance
@@ -135,6 +147,7 @@ class InjectionManager(metaclass=Singleton):
                     kwargs[argument] = self.get_component(cls=data.cls, name=data.name)
 
                 ic.instance = ic.constructor(**kwargs)
+                self.init_stack.append(ic.instance)
             return ic.instance
 
     def _add_container(self, ic: InstanceContainer):
@@ -156,3 +169,11 @@ class InjectionManager(metaclass=Singleton):
         self.by_class[cls].append(ic)
         for base in cls.__bases__:
             self._add_container_by_class(base, ic)
+
+    @staticmethod
+    def _has_post_init(instance):
+        return hasattr(instance, "post_init") and callable(instance.post_init)
+
+    @staticmethod
+    def _has_pre_destroy(instance):
+        return hasattr(instance, "pre_destroy") and callable(instance.pre_destroy)
