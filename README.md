@@ -66,7 +66,6 @@ You can get its result by function name (or by decorator parameter `name`) and b
 present.
 All dependencies from constructor arguments will be resolved the same way they are resolved in `__init__` method.
 
-
 ## Inject directive
 
 In some rare cases you would like to manually set injectable components.
@@ -93,6 +92,27 @@ def some_constructor(dependency):
 
 In that case dependencies will be resolved by they names or classes provided in inject dictionary.
 
+## post_init and pre_destroy
+
+When creating components tagil build initialization stack.
+You can manually call `InjectionManager().post_init()` and `InjectionManager().pre_destory()` or use application
+template via `Application` base class:
+
+```python
+from tagil import component, Application
+
+
+@component()
+class SimpleApp(Application):
+    def run(self) -> int:
+        return 0
+
+
+if __name__ == "__main__":
+    SimpleApp.main()
+```
+
+All calls for `post_init` and `pre_destroy` methods of components will be performed by base class.
 
 ## Component resolving algorythm
 
