@@ -45,7 +45,8 @@ class InjectionManager(metaclass=Singleton):
         ic.name = name
 
         res = signature(method).return_annotation
-        # Todo: add class info
+        if res is not inspect._empty:
+            self._add_container_by_class(res, ic)
 
         self._add_container_by_name(name, ic)
 

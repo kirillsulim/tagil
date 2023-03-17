@@ -13,9 +13,9 @@ class NoRegisteredClassFound(TagilException):
 
 class ManyComponentsMatches(TagilException):
     def __init__(self, classes: Iterable):
-        super().__init__(f"Many components matches: {', '.join(classes)}.")
+        super().__init__(f"Many components matches: {', '.join(map(str, classes))}.")
 
 
 class DuplicateNameForComponent(TagilException):
     def __init__(self, name: str):
-        super().__init__(f"Component or constructor with name {name} already exists.")
+        super().__init__(f"Component or constructor with name '{name}' already exists.")
