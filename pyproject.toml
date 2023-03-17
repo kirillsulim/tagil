@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tagil"
-version = "0.1.0.post2"
+version = "0.1.0.post3"
 description = "Dependency injection library for python"
 authors = ["Kirill Sulim <kirillsulim@gmail.com>"]
 license = "mit"
