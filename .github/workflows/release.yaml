@@ -19,10 +19,10 @@ jobs:
         with:
           url: https://vault.su0.org
           method: approle
-          roleId: "ci_kirillsulim_oak_build"
+          roleId: "ci_kirillsulim_tagil"
           secretId: ${{ secrets.VAULT_SECRET_ID }}
           secrets: |
-            secret/data/ci/kirillsulim/oak-build pypi_token | PYPI_API_TOKEN
+            secret/data/ci/kirillsulim/tagil pypi_token | PYPI_API_TOKEN
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
