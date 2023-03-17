@@ -6,9 +6,9 @@ class TagilException(Exception):
         super().__init__(message)
 
 
-class NoRegisteredClassFound(TagilException):
-    def __init__(self, cls):
-        super().__init__(f"Cannot find class {cls.__name__}.")
+class NoRegisteredComponentFound(TagilException):
+    def __init__(self, cls, name):
+        super().__init__(f"Cannot find component by class {cls.__name__} and name '{name}'.")
 
 
 class ManyComponentsMatches(TagilException):

@@ -1,7 +1,7 @@
 import inspect
 from inspect import signature
 from collections import defaultdict
-from typing import Optional
+from typing import Optional, Dict, Union, Type
 from threading import Lock
 
 from tagil.exceptions import *
@@ -13,6 +13,7 @@ class InstanceContainer:
         self.name = None
         self.cls = None
         self.constructor = None
+        self.inject = None
         self.instance = None
         self.mutex = Lock()
 
@@ -22,11 +23,14 @@ class InjectionManager(metaclass=Singleton):
         self.by_class = defaultdict(list)
         self.by_name = defaultdict(list)
 
-    def register_component(self, cls, name: Optional[str]):
+    def register_component(self, cls, name: Optional[str] = None, inject: Optional[Dict[str, Union[str, Type]]] = None):
         ic = InstanceContainer()
         ic.cls = cls
-        ic.constructor = cls
         ic.name = name
+        if inject is not None:
+            ic.inject = inject
+        else:
+            ic.inject = {}
 
         self.by_class[cls].append(ic)
         for base in cls.__bases__:
@@ -35,9 +39,13 @@ class InjectionManager(metaclass=Singleton):
         if name is not None:
             self._add_container_by_name(name, ic)
 
-    def register_constructor(self, method, name: Optional[str] = None):
+    def register_constructor(self, method, name: Optional[str] = None, inject: Optional[Dict[str, Union[str, Type]]] = None):
         ic = InstanceContainer()
         ic.constructor = method
+        if inject is not None:
+            ic.inject = inject
+        else:
+            ic.inject = {}
 
         if name is None:
             name = method.__name__
@@ -62,7 +70,7 @@ class InjectionManager(metaclass=Singleton):
             raise ValueError("Must be called with cls or name or both")
 
         if len(candidates) == 0:
-            raise NoRegisteredClassFound(cls)
+            raise NoRegisteredComponentFound(cls, name)
         elif len(candidates) == 1:
             return self._get_instance(candidates[0])
         else:
@@ -73,16 +81,25 @@ class InjectionManager(metaclass=Singleton):
             return ic.instance
 
         with ic.mutex:
-            constructor_function = ic.constructor if ic.constructor is not None else ic.cls.__init__
+            constructor_function = ic.constructor if ic.constructor is not None else ic.cls
 
             argument_types = signature(constructor_function).parameters
             kwargs = {}
-            for i, argument in enumerate(argument_types):
-                if constructor_function == ic.cls.__init__ and i == 0:
-                    continue  # Skip self for __init__
+            for argument in argument_types:
                 type = argument_types[argument].annotation
                 type = type if type is not inspect._empty else None
-                kwargs[argument] = self.get_component(cls=type, name=argument)
+                name = argument
+                if argument in ic.inject:
+                    inject_direction = ic.inject[argument]
+                    if isinstance(inject_direction, str):
+                        name = inject_direction
+                        type = None
+                    elif isinstance(inject_direction, Type):
+                        type = inject_direction
+                    else:
+                        raise ValueError(f"Illegal inject direction '{inject_direction}' of type {inject_direction.__class__}.")
+
+                kwargs[argument] = self.get_component(cls=type, name=name)
 
         instance = constructor_function(**kwargs)
         ic.instance = instance
