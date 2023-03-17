@@ -1,4 +1,4 @@
-from typing import List, Iterable
+from typing import Iterable
 
 
 class TagilException(Exception):
@@ -8,7 +8,9 @@ class TagilException(Exception):
 
 class NoRegisteredComponentFound(TagilException):
     def __init__(self, cls, name):
-        super().__init__(f"Cannot find component by class {cls.__name__} and name '{name}'.")
+        super().__init__(
+            f"Cannot find component by class {cls.__name__} and name '{name}'."
+        )
 
 
 class ManyComponentsMatches(TagilException):

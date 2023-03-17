@@ -4,7 +4,11 @@ from collections import defaultdict
 from typing import Optional, Dict, Union, Type, Callable
 from threading import Lock
 
-from tagil.exceptions import *
+from tagil.exceptions import (
+    DuplicateNameForComponent,
+    ManyComponentsMatches,
+    NoRegisteredComponentFound,
+)
 from tagil.singleton import Singleton
 
 
@@ -20,25 +24,27 @@ class ArgumentData:
 
 class InstanceContainer:
     def __init__(
-            self,
-            cls: Optional[type] = None,
-            constructor: Optional[Callable] = None,
-            name: Optional[str] = None,
-            inject: Optional[Dict[str, Union[str, Type]]] = None,
+        self,
+        cls: Optional[type] = None,
+        constructor: Optional[Callable] = None,
+        name: Optional[str] = None,
+        inject: Optional[Dict[str, Union[str, Type]]] = None,
     ):
         if cls is None and constructor is None:
-            raise ValueError(f"Expect cls or constructor but both are None")
+            raise ValueError("Expect cls or constructor but both are None")
         elif cls is not None and constructor is not None:
-            raise ValueError(f"Expect clr or constructor but both are not None")
+            raise ValueError("Expect clr or constructor but both are not None")
 
         if constructor is not None:
-            cls = _extract_type_from_annotation(signature(constructor).return_annotation)
+            cls = _extract_type_from_annotation(
+                signature(constructor).return_annotation
+            )
             if name is None:
                 name = constructor.__name__
         elif cls is not None:
             constructor = cls
         else:
-            raise ValueError(f"Somehow check of constructor or cls presence failed")
+            raise ValueError("Somehow check of constructor or cls presence failed")
 
         self.cls = cls
         self.constructor = constructor
@@ -63,7 +69,8 @@ class InstanceContainer:
                     cls = inject_direction
                 else:
                     raise ValueError(
-                        f"Illegal inject direction '{inject_direction}' of type {inject_direction.__class__}.")
+                        f"Illegal inject direction '{inject_direction}' of type {inject_direction.__class__}."
+                    )
             else:
                 cls = _extract_type_from_annotation(argument_types[argument].annotation)
                 name = argument
@@ -80,24 +87,20 @@ class InjectionManager(metaclass=Singleton):
         self.init_stack = []
 
     def register_component(
-            self,
-            cls: Type,
-            name: Optional[str] = None,
-            inject: Optional[Dict[str, Union[str, Type]]] = None
+        self,
+        cls: Type,
+        name: Optional[str] = None,
+        inject: Optional[Dict[str, Union[str, Type]]] = None,
     ):
-        ic = InstanceContainer(
-            cls=cls,
-            name=name,
-            inject=inject
-        )
+        ic = InstanceContainer(cls=cls, name=name, inject=inject)
 
         self._add_container(ic)
 
     def register_constructor(
-            self,
-            method: Callable,
-            name: Optional[str] = None,
-            inject: Optional[Dict[str, Union[str, Type]]] = None
+        self,
+        method: Callable,
+        name: Optional[str] = None,
+        inject: Optional[Dict[str, Union[str, Type]]] = None,
     ):
         ic = InstanceContainer(
             constructor=method,

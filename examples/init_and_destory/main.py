@@ -29,5 +29,5 @@ class InitDestroyApp(Application):
         print("App:pre_destroy")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     InitDestroyApp.main()

@@ -1,7 +1,10 @@
 from unittest import TestCase
 
 from tagil import component, InjectionManager, constructor
-from tagil.exceptions import *
+from tagil.exceptions import (
+    NoRegisteredComponentFound,
+    DuplicateNameForComponent,
+)
 
 
 @component
@@ -79,24 +82,30 @@ class ComponentInjectByClass:
         self.arg = arg
 
 
-@component(inject={
-    "arg": "named_stub",
-})
+@component(
+    inject={
+        "arg": "named_stub",
+    }
+)
 class ComponentInjectByName:
     def __init__(self, arg):
         self.arg = arg
 
 
-@constructor(inject={
-    "arg": StubClass,
-})
+@constructor(
+    inject={
+        "arg": StubClass,
+    }
+)
 def constructor_inject_by_class(arg):
     return arg
 
 
-@constructor(inject={
-    "arg": "named_stub",
-})
+@constructor(
+    inject={
+        "arg": "named_stub",
+    }
+)
 def constructor_inject_by_name(arg):
     return arg
 
@@ -142,13 +151,19 @@ class TestManager(TestCase):
         with self.assertRaises(DuplicateNameForComponent) as context:
             InjectionManager().register_component(DuplicatedStab, name="duplicate")
 
-        self.assertEqual("Component or constructor with name 'duplicate' already exists.", str(context.exception))
+        self.assertEqual(
+            "Component or constructor with name 'duplicate' already exists.",
+            str(context.exception),
+        )
 
     def test_raise_exception_when_trying_to_get_unregistered_component_by_cls(self):
         with self.assertRaises(NoRegisteredComponentFound) as context:
             InjectionManager().get_component(Unregistered)
 
-        self.assertEqual("Cannot find component by class Unregistered and name 'None'.", str(context.exception))
+        self.assertEqual(
+            "Cannot find component by class Unregistered and name 'None'.",
+            str(context.exception),
+        )
 
     def test_get_by_constructor_return_class(self):
         instance = InjectionManager().get_component(ConstructorReturn)
