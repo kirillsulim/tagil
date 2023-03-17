@@ -23,10 +23,22 @@ class InterfaceClass:
 class ImplementationClass(InterfaceClass):
     name = "implementation"
 
+
 @component
 class WithInterfaceDependency:
     def __init__(self, interface: InterfaceClass):
         self.interface = interface
+
+
+@component(name="named_stub")
+class NamedStub:
+    pass
+
+
+@component
+class WithNamedStub:
+    def __init__(self, named_stub):
+        self.named_stub = named_stub
 
 
 class TestManager(TestCase):
@@ -47,3 +59,9 @@ class TestManager(TestCase):
 
         self.assertTrue(isinstance(instance, WithInterfaceDependency))
         self.assertTrue(isinstance(instance.interface, ImplementationClass))
+
+    def test_resolve_by_argument_name(self):
+        instance = InjectionManager().get_component(WithNamedStub)
+
+        self.assertTrue(isinstance(instance, WithNamedStub))
+        self.assertTrue(isinstance(instance.named_stub, NamedStub))
