@@ -1,7 +1,8 @@
 import inspect
+import os
 from inspect import signature
 from collections import defaultdict
-from typing import Optional, Dict, Union, Type, Callable
+from typing import Optional, Dict, Union, Type, Callable, List
 from threading import Lock
 
 from tagil.exceptions import (
@@ -29,6 +30,7 @@ class InstanceContainer:
         constructor: Optional[Callable] = None,
         name: Optional[str] = None,
         inject: Optional[Dict[str, Union[str, Type]]] = None,
+        profile: Optional[Union[str, List[str]]] = None,
     ):
         if cls is None and constructor is None:
             raise ValueError("Expect cls or constructor but both are None")
@@ -50,6 +52,7 @@ class InstanceContainer:
         self.constructor = constructor
         self.name = name
         self.inject = {} if inject is None else inject
+        self.profile = None if profile is None else set(profile)
 
         self.instance = None
         self.mutex = Lock()
@@ -81,18 +84,28 @@ class InstanceContainer:
 
 
 class InjectionManager(metaclass=Singleton):
+    PROFILES_ENV = "TAGIL_PROFILES"
+
     def __init__(self):
         self.by_class = defaultdict(list)
         self.by_name = defaultdict(list)
         self.init_stack = []
+
+        self.profiles = self._parse_profiles()
 
     def register_component(
         self,
         cls: Type,
         name: Optional[str] = None,
         inject: Optional[Dict[str, Union[str, Type]]] = None,
+        profile: Optional[Union[str, List[str]]] = None,
     ):
-        ic = InstanceContainer(cls=cls, name=name, inject=inject)
+        ic = InstanceContainer(
+            cls=cls,
+            name=name,
+            inject=inject,
+            profile=profile,
+        )
 
         self._add_container(ic)
 
@@ -101,11 +114,13 @@ class InjectionManager(metaclass=Singleton):
         method: Callable,
         name: Optional[str] = None,
         inject: Optional[Dict[str, Union[str, Type]]] = None,
+        profile: Optional[Union[str, List[str]]] = None,
     ):
         ic = InstanceContainer(
             constructor=method,
             name=name,
             inject=inject,
+            profile=profile,
         )
 
         self._add_container(ic)
@@ -114,10 +129,24 @@ class InjectionManager(metaclass=Singleton):
         candidates = []
         if cls is not None:
             candidates.extend(self.by_class[cls])
+            candidates = list(
+                filter(
+                    lambda c: c.profile is None
+                    or len(c.profile.intersection(self.profiles)) != 0,
+                    candidates,
+                )
+            )
             if len(candidates) > 1 and name is not None:
                 candidates = list(filter(lambda ic: ic.name == name, candidates))
         elif name is not None:
             candidates.extend(self.by_name[name])
+            candidates = list(
+                filter(
+                    lambda c: c.profile is None
+                    or len(c.profile.intersection(self.profiles)) != 0,
+                    candidates,
+                )
+            )
         else:
             raise ValueError("Must be called with cls or name or both")
 
@@ -180,3 +209,8 @@ class InjectionManager(metaclass=Singleton):
     @staticmethod
     def _has_pre_destroy(instance):
         return hasattr(instance, "pre_destroy") and callable(instance.pre_destroy)
+
+    @staticmethod
+    def _parse_profiles():
+        profiles_str = os.environ.get(InjectionManager.PROFILES_ENV, "")
+        return {s.strip().lower() for s in profiles_str.split(",")}

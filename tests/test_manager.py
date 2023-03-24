@@ -110,6 +110,20 @@ def constructor_inject_by_name(arg):
     return arg
 
 
+class Profiled:
+    pass
+
+
+@component(profile="a")
+class ProfiledA(Profiled):
+    pass
+
+
+@component(profile="b")
+class ProfiledB(Profiled):
+    pass
+
+
 class TestManager(TestCase):
     def test_stub_class_load(self):
         instance = InjectionManager().get_component(StubClass)
@@ -191,3 +205,13 @@ class TestManager(TestCase):
         instance = InjectionManager().get_component(name="constructor_inject_by_name")
 
         self.assertIsInstance(instance, NamedStub)
+
+    def test_profile(self):
+        manager = InjectionManager()
+        saved = manager.profiles
+        manager.profiles = set("a")
+
+        instance = InjectionManager().get_component(Profiled)
+
+        self.assertIsInstance(instance, ProfiledA)
+        manager.profile = saved
