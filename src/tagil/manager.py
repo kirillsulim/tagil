@@ -100,7 +100,12 @@ class InjectionManager(metaclass=Singleton):
         inject: Optional[Dict[str, Union[str, Type]]] = None,
         profile: Optional[Union[str, List[str]]] = None,
     ):
-        ic = InstanceContainer(cls=cls, name=name, inject=inject, profile=profile,)
+        ic = InstanceContainer(
+            cls=cls,
+            name=name,
+            inject=inject,
+            profile=profile,
+        )
 
         self._add_container(ic)
 
@@ -124,18 +129,24 @@ class InjectionManager(metaclass=Singleton):
         candidates = []
         if cls is not None:
             candidates.extend(self.by_class[cls])
-            candidates = list(filter(
-                lambda c: c.profile is None or len(c.profile.intersection(self.profiles)) != 0,
-                candidates
-            ))
+            candidates = list(
+                filter(
+                    lambda c: c.profile is None
+                    or len(c.profile.intersection(self.profiles)) != 0,
+                    candidates,
+                )
+            )
             if len(candidates) > 1 and name is not None:
                 candidates = list(filter(lambda ic: ic.name == name, candidates))
         elif name is not None:
             candidates.extend(self.by_name[name])
-            candidates = list(filter(
-                lambda c: c.profile is None or len(c.profile.intersection(self.profiles)) != 0,
-                candidates
-            ))
+            candidates = list(
+                filter(
+                    lambda c: c.profile is None
+                    or len(c.profile.intersection(self.profiles)) != 0,
+                    candidates,
+                )
+            )
         else:
             raise ValueError("Must be called with cls or name or both")
 
